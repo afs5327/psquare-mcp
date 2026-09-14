@@ -62,7 +62,15 @@ class PSClient:
         Raises MFARequiredError if 2FA is needed — caller should store the
         mfa_state and prompt the user for the code via submit_mfa_code tool.
         """
-        from parentsquare_mcp.auth import load_credentials, login
+        from parentsquare_mcp.auth import MFARequiredError, load_credentials, login
+
+        if self.mfa_state is not None:
+            # A verification code is already pending — re-POSTing the password
+            # here would trigger ANOTHER MFA send instead of waiting for the
+            # one already in flight. Under unattended (PS_NO_ELICIT) callers
+            # that retry on failure, this loop silently spams MFA emails and
+            # risks an account lockout. Re-raise the existing state instead.
+            raise MFARequiredError(self.mfa_state)
 
         logger.info("Session expired, loading credentials...")
         self.invalidate_csrf_token()
